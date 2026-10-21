@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# Local env / secrets overrides
+.env
+.env.*
+docker-compose.override.yml
+
+# Local Docker bind-mount data (stack uses named volumes)
+docker-volume/
+
+# Editors / OS
+.vscode/
+.idea/
+.claude/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log

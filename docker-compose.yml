@@ -1,0 +1,75 @@
+name: nexabank-gov
+
+# OpenMetadata stack (official compose, see the file header for the small edits)
+include:
+  - openmetadata/docker-compose.openmetadata.yml
+
+x-pg: &pg
+  image: postgres:17-alpine
+  restart: unless-stopped
+  networks: [app_net]
+  healthcheck:
+    test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+    interval: 5s
+    retries: 20
+
+services:
+  # ---------- NexaBank source systems: three separate databases, three sets of credentials ----------
+  customers-db:
+    <<: *pg
+    container_name: nexabank-customers-db
+    environment: { POSTGRES_DB: customers_db, POSTGRES_USER: crm_admin, POSTGRES_PASSWORD: crm_admin_pw }
+    ports: ["5433:5432"]
+    volumes:
+      - ./databases/customers:/docker-entrypoint-initdb.d:ro
+      - customers-data:/var/lib/postgresql/data
+
+  transactions-db:
+    <<: *pg
+    container_name: nexabank-transactions-db
+    environment: { POSTGRES_DB: transactions_db, POSTGRES_USER: payments_admin, POSTGRES_PASSWORD: payments_admin_pw }
+    ports: ["5434:5432"]
+    volumes:
+      - ./databases/transactions:/docker-entrypoint-initdb.d:ro
+      - transactions-data:/var/lib/postgresql/data
+
+  analytics-db:
+    <<: *pg
+    container_name: nexabank-analytics-db
+    command: postgres -c shared_preload_libraries=pg_stat_statements -c pg_stat_statements.track=all
+    environment: { POSTGRES_DB: analytics_db, POSTGRES_USER: analytics_admin, POSTGRES_PASSWORD: analytics_admin_pw }
+    ports: ["5435:5432"]
+    volumes:
+      - ./databases/analytics:/docker-entrypoint-initdb.d:ro
+      - analytics-data:/var/lib/postgresql/data
+
+  # ---------- "before governance" tool: a plain DB browser ----------
+  adminer:
+    image: adminer:5.4.1
+    container_name: nexabank-adminer
+    restart: unless-stopped
+    ports: ["8081:8080"]
+    networks: [app_net]
+
+  # ---------- One-shot tools: fills analytics_db at startup, then exits ----------
+  # Also used by scripts/reset.ps1 and scripts/register-lineage.ps1 via "docker compose run --rm tools ..."
+  tools:
+    build: ./tools
+    container_name: nexabank-tools
+    restart: "no"
+    networks: [app_net]
+    depends_on:
+      customers-db: { condition: service_healthy }
+      transactions-db: { condition: service_healthy }
+      analytics-db: { condition: service_healthy }
+    environment:
+      OM_URL: http://openmetadata-server:8585
+      OM_ADMIN_EMAIL: admin@open-metadata.org
+      OM_ADMIN_PASSWORD: admin
+    volumes:
+      - ./databases:/databases:ro       # seed scripts, used by reset-data
+
+volumes:
+  customers-data:
+  transactions-data:
+  analytics-data:
