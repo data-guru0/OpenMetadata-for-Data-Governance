@@ -32,7 +32,8 @@ No local Python or database tools needed: everything runs in containers.
 ## 5. Start
 
 ```powershell
-cd "D:\AI Governance Code\06_Data Governance"
+git clone https://github.com/data-guru0/OpenMetadata-for-Data-Governance.git
+cd OpenMetadata-for-Data-Governance
 .\scripts\start.ps1
 ```
 
